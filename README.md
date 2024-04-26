@@ -13,3 +13,5 @@ A template repo for terraform and subsequent dev work
     #!/bin/bash
     poetry install
     ```
+- If **pre-commit** not installed then install using ```pip install pre-commit```. Ensure to use the pip matched to the same python version you have set poetry to use above
+- Run **pre-commit install** to set up the git hook scripts
