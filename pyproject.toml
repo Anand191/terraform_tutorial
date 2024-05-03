@@ -42,6 +42,8 @@ openpyxl = "^3.1.2" # used by the logging library
 typer = "<0.10.0"
 fastapi = "^0.110.1"
 uvicorn = "^0.29.0"
+redis = "^5.0.4"
+tqdm = "^4.66.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
