@@ -1,5 +1,10 @@
 import time
 from functools import wraps
+from pathlib import Path
+from typing import Dict
+
+import yaml
+from dotenv import find_dotenv, load_dotenv
 
 
 def timeit(func):
@@ -13,3 +18,15 @@ def timeit(func):
         return result
 
     return timeit_wrapper
+
+
+def load_env():
+    load_dotenv(find_dotenv(".env_dev"))
+
+
+def load_conf(project_root: str) -> Dict:
+    root = Path(project_root)
+    conf_path = root / "ai_assistant" / "config.yaml"
+    with open(conf_path) as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+    return cfg
