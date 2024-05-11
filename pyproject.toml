@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ai_assistant"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
     "Anand <anand1911991@outlook.com>",
 ]
@@ -44,6 +44,8 @@ fastapi = "^0.110.1"
 uvicorn = "^0.29.0"
 redis = "^5.0.4"
 tqdm = "^4.66.2"
+google-cloud-documentai = "^2.27.0"
+pypdf2 = "^3.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
