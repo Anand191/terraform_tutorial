@@ -19,5 +19,7 @@ class wiki_assistant(dspy.Module):
 
     def forward(self, question):
         retrieved = Retrieval(self.collection, self.db)(question)
-        prediction = self.prog(context=retrieved, question=question)
-        return dspy.Prediction(context=retrieved, answer=prediction.answer)
+        prediction = self.prog.forward(context=retrieved, question=question)
+        answer = prediction.answer.strip()
+        # dspy.Prediction(context=retrieved, answer=prediction.answer)
+        return answer

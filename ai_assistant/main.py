@@ -98,7 +98,7 @@ def chat(
             break
 
         response = assistant(message)
-        print(f"Assistant: {response.answer}")
+        print(f"Assistant: {response}")
         print()
 
 
