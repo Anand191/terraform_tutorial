@@ -1,4 +1,6 @@
+import logging
 import re
+import sys
 
 import dspy
 import typer
@@ -10,8 +12,13 @@ from ai_assistant.generator import init_gemini_pro
 from ai_assistant.generator.optimized_qa import load_dataset, optimize_generator
 from ai_assistant.generator.qa import wiki_assistant
 from ai_assistant.retriever.vdb_index import index_webpage
+from ai_assistant.retriever.vdb_retrieve import Retrieval
 from ai_assistant.utils.db_utils import collection_cache
+from ai_assistant.utils.global_utils import setup_loguru_logging_interceptor
 
+logger.remove()
+logger.add(sys.stderr, level="INFO")
+setup_loguru_logging_interceptor(level=logging.CRITICAL, modules=("dspy"))
 app = typer.Typer()
 
 
@@ -28,10 +35,13 @@ def initialize_generator(
     collection: str, db_location: str, temp: float = 0.2, optimize: bool = False
 ) -> dspy.Module:
     # Init LM in DSPy
-    init_gemini_pro(temperature=temp)
-    cot_assistant = wiki_assistant(
-        retriver_collection=collection, database_loc=db_location
-    )
+    gemini = init_gemini_pro(temperature=temp)
+    # Init retriever in DsPy
+    retriever = Retrieval(collection, db_location)
+    # Setup LM and RM in DSPy
+    dspy.settings.configure(lm=gemini, temperature=temp, max_tokens=1024, rm=retriever)
+
+    cot_assistant = wiki_assistant().activate_assertions()
     if optimize:
         logger.info("Using optimized CoT agent")
         # Get trainset and optimize base module
@@ -48,7 +58,7 @@ def chat(
             help="URL of wikipedia page for the Q/A Assistant",
             rich_help_panel="Arguments",
         ),
-    ] = "https://en.wikipedia.org/wiki/Go_(game)",
+    ] = "https://en.wikipedia.org/wiki/Bhagavad_Gita",
     update: Annotated[
         bool,
         typer.Option(
@@ -100,6 +110,7 @@ def chat(
         response = assistant(message)
         print(f"Assistant: {response.answer}")
         print()
+    logger.info("Chat session ended")
 
 
 if __name__ == "__main__":

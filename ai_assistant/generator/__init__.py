@@ -1,6 +1,5 @@
 import os
 
-import dspy
 from dsp.modules import GoogleVertexAI
 from google.oauth2 import service_account
 
@@ -18,6 +17,9 @@ def init_gemini_pro(temperature: float = 0.0):
     """
     credentials = service_account.Credentials.from_service_account_file(google_api_key)
     gemini = GoogleVertexAI(
-        model_name=cfg["llm"]["model"], project=cfg["project"], location=cfg["llm"]["location"], credentials=credentials
+        model_name=cfg["llm"]["model"],
+        project=cfg["project"],
+        location=cfg["llm"]["location"],
+        credentials=credentials,
     )
-    dspy.settings.configure(lm=gemini, temperature=temperature, max_tokens=1024)
+    return gemini
