@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import sys
 
@@ -8,18 +9,22 @@ from loguru import logger
 from typing_extensions import Annotated
 
 from ai_assistant.crawler.web_crawler import parse_wiki
-from ai_assistant.generator import init_gemini_pro
+from ai_assistant.generator import init_gemini_pro, init_openai
 from ai_assistant.generator.optimized_qa import load_dataset, optimize_generator
 from ai_assistant.generator.qa import wiki_assistant
 from ai_assistant.retriever.vdb_index import index_webpage
 from ai_assistant.retriever.vdb_retrieve import Retrieval
 from ai_assistant.utils.db_utils import collection_cache
-from ai_assistant.utils.global_utils import setup_loguru_logging_interceptor
+from ai_assistant.utils.global_utils import load_conf, setup_loguru_logging_interceptor
 
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 setup_loguru_logging_interceptor(level=logging.CRITICAL, modules=("dspy"))
 app = typer.Typer()
+
+# Load config
+cfg = load_conf(os.environ.get("ROOT"))
+logger.info(cfg)
 
 
 def store_webpage(
@@ -35,11 +40,16 @@ def initialize_generator(
     collection: str, db_location: str, temp: float = 0.2, optimize: bool = False
 ) -> dspy.Module:
     # Init LM in DSPy
-    gemini = init_gemini_pro(temperature=temp)
+    if cfg["base"]["service"] == "azure":
+        logger.info(f'Using {cfg["azure"]["llm"]["model"]}')
+        model = init_openai(temperature=temp)
+    else:
+        logger.info(f'Using {cfg["gcp"]["llm"]["model"]}')
+        model = init_gemini_pro(temperature=temp)
     # Init retriever in DsPy
     retriever = Retrieval(collection, db_location)
     # Setup LM and RM in DSPy
-    dspy.settings.configure(lm=gemini, temperature=temp, max_tokens=1024, rm=retriever)
+    dspy.settings.configure(lm=model, temperature=temp, max_tokens=1024, rm=retriever)
 
     cot_assistant = wiki_assistant().activate_assertions()
     if optimize:

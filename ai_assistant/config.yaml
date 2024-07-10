@@ -1,8 +1,15 @@
-project: deft-weaver-396616
-llm:
-  model: gemini-1.0-pro-002
-  location: us-central1
-documentAI:
-  processor: a39ef57dc4bf59c2
-  region: eu
-  sync_max_pages: 15
+base:
+  service: azure
+gcp:
+  project: deft-weaver-396616
+  llm:
+    model: gemini-1.0-pro-002
+    location: us-central1
+  documentAI:
+    processor: a39ef57dc4bf59c2
+    region: eu
+    sync_max_pages: 15
+azure:
+  llm:
+    model: gpt-4o
+    version: 2023-03-15-preview
