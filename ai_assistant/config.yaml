@@ -11,5 +11,5 @@ gcp:
     sync_max_pages: 15
 azure:
   llm:
-    model: gpt-4o
+    model: gpt-4o-sweden
     version: 2023-03-15-preview
