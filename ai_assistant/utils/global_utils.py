@@ -25,7 +25,7 @@ def timeit(func):
 
 
 def load_env():
-    load_dotenv(find_dotenv(".env_dev"))
+    load_dotenv(find_dotenv())
 
 
 def load_conf(project_root: str) -> Dict:
