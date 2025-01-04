@@ -52,6 +52,10 @@ vertexai = "^1.65.0"
 azure-identity = "^1.17.1"
 azure-keyvault = "^4.2.0"
 opentelemetry-exporter-otlp-proto-grpc = "1.25.0"
+google-api-python-client = "^2.157.0"
+google-auth-httplib2 = "^0.2.0"
+google-auth-oauthlib = "^1.2.1"
+google-cloud-storage = "^2.19.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
