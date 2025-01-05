@@ -1,7 +1,8 @@
 import io
 import os
 import os.path
-from typing import List
+from datetime import datetime
+from typing import Any, Dict, List
 
 from google.auth.transport.requests import Request
 from google.cloud import storage
@@ -41,16 +42,49 @@ def get_blobs(bucket_name: str, folder_name: str) -> List:
         return []
     else:
         file_objects = list(client.list_blobs(bucket, prefix=f"{folder_name}/"))
-        return [obj.name for obj in file_objects][1:]
+        blob_names = [obj.name for obj in file_objects][1:]
+        blob_metadata = [
+            datetime.strptime(obj.metadata.get("modifiedTime"), "%Y-%m-%dT%H:%M:%S.%fZ")
+            for obj in file_objects[1:]
+        ]
+        blob_timestamps = {
+            fname: tstamp for fname, tstamp in zip(blob_names, blob_metadata)
+        }
+        return (blob_names, blob_timestamps)
 
 
 def upload_to_gcs(
-    bucket_name: str, file_blob: MediaIoBaseDownload, file_name: str
+    bucket_name: str, file_blob: Any, file_name: str, metadata: Dict[str, str]
 ) -> None:
     client = storage.Client(gcp_project_name, gcs_creds)
     bucket_name = client.get_bucket(bucket_name)
     blob = Blob(file_name, bucket_name)
+
+    # Set blob metadata
+    metageneration_match_precondition = None
+    # Optional: set a metageneration-match precondition to avoid potential race
+    # conditions and data corruptions. The request to patch is aborted if the
+    # object's metageneration does not match your precondition.
+    metageneration_match_precondition = blob.metageneration
+    blob.metadata = metadata
+    if metageneration_match_precondition is not None:
+        logger.info(metageneration_match_precondition)
+        blob.patch(if_metageneration_match=metageneration_match_precondition)
+    # Upload to GCS Bucket
     blob.upload_from_file(file_blob, rewind=True)
+
+
+def delete_from_gcs():
+    pass
+
+
+def _get_revision(service: Any, file_id: str) -> Dict[str, str]:
+    response = (
+        service.revisions().list(fileId=file_id, fields="*", pageSize=1000).execute()
+    )
+
+    revisions = response.get("revisions")
+    return revisions[-1]
 
 
 def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
@@ -81,10 +115,12 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
     try:
         service = build("drive", "v3", credentials=creds)
         page_token = None
-        objects_list = get_blobs(bucket_name, parent_id)
-
+        objects_list, objects_metadata = get_blobs(bucket_name, parent_id)
+        logger.debug(
+            f"File: modification timestamp = { {k: v.strftime('%Y-%m-%dT%H:%M:%S.%fZ') for k, v in objects_metadata.items()} }"
+        )
         while True:
-            # Call the Drive v3 API
+            # Call the Drive v3 API and get all files from specified parent folder
             results = (
                 service.files()
                 .list(
@@ -99,11 +135,22 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
             if not items:
                 logger.info("No files found.")
                 return
-
+            # Loop over all found objects and upsert new/modified
+            # objects to GCS bucket and delete objects no longer present
+            # in drive
             for item in items:
                 file_id = item.get("id")
                 file_name = f"{parent_id}/{item.get('name')}"
-                if file_name not in objects_list:
+                revision = _get_revision(service, file_id)
+                revision_timestamp = datetime.strptime(
+                    revision.get("modifiedTime"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+                logger.debug(
+                    f"Last revision timestamp for file {file_name} is {revision_timestamp}"
+                )
+                if (file_name not in objects_list) or (
+                    revision_timestamp > objects_metadata.get(file_name)
+                ):
                     request = service.files().get_media(fileId=file_id)
                     file_download_buffer = io.BytesIO()
                     downloader = MediaIoBaseDownload(file_download_buffer, request)
@@ -111,15 +158,18 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
                     while done is False:
                         status, done = downloader.next_chunk()
                         # print(f"Download {int(status.progress() * 100)}.")
-                    upload_to_gcs(bucket_name, file_download_buffer, file_name)
+                    upload_to_gcs(
+                        bucket_name, file_download_buffer, file_name, metadata=revision
+                    )
                     logger.info(
                         f"Found file: {item['name']} ({item['id']}),"
-                        f" and uploaded to GCS bucket: {bucket_name} and folder: {parent_id}"
+                        f" and (latest version) uploaded to GCS bucket: {bucket_name} and folder: {parent_id}"
                     )
                 else:
                     logger.info(
                         f"File: {item['name']} ({item['id']} already exists in gs://{bucket_name}/{parent_id}"
                     )
+                # TODO: add deletion from GCS of non-existing files in drive
 
             page_token = results.get("nextPageToken", None)
 
