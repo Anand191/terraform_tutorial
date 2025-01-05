@@ -74,8 +74,18 @@ def upload_to_gcs(
     blob.upload_from_file(file_blob, rewind=True)
 
 
-def delete_from_gcs():
-    pass
+def delete_from_gcs(
+    bucket_name: str, folder_name: str, deleted_files: List[str]
+) -> None:
+    client = storage.Client(gcp_project_name, gcs_creds)
+    bucket = client.get_bucket(bucket_name)
+    blobs = list(client.list_blobs(bucket, prefix=f"{folder_name}/"))
+    blobs = [blob for blob in blobs[1:] if blob.name in deleted_files]
+    for blob in blobs:
+        logger.info(
+            f"Deleting {blob.name.split('/')[-1]} from gs://{bucket_name}/{folder_name}"
+        )
+        blob.delete()
 
 
 def _get_revision(service: Any, file_id: str) -> Dict[str, str]:
@@ -117,20 +127,21 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
         page_token = None
         objects_list, objects_metadata = get_blobs(bucket_name, parent_id)
         logger.debug(
-            f"File: modification timestamp = { {k: v.strftime('%Y-%m-%dT%H:%M:%S.%fZ') for k, v in objects_metadata.items()} }"
+            f"File: modification_timestamp = { {k.split('/')[-1]: v.strftime('%Y-%m-%dT%H:%M:%S.%fZ') for k, v in objects_metadata.items()} }"
         )
         while True:
             # Call the Drive v3 API and get all files from specified parent folder
             results = (
                 service.files()
                 .list(
-                    q=f"mimeType != 'application/vnd.google-apps.folder' and parents in '{parent_id}'",
+                    q=f"mimeType != 'application/vnd.google-apps.folder' and parents in '{parent_id}' and trashed = false",
                     fields="nextPageToken, files(id, name)",
                     pageToken=page_token,
                 )
                 .execute()
             )
             items = results.get("files", [])
+            gdrive_files = []
 
             if not items:
                 logger.info("No files found.")
@@ -141,12 +152,13 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
             for item in items:
                 file_id = item.get("id")
                 file_name = f"{parent_id}/{item.get('name')}"
+                gdrive_files.append(file_name)
                 revision = _get_revision(service, file_id)
                 revision_timestamp = datetime.strptime(
                     revision.get("modifiedTime"), "%Y-%m-%dT%H:%M:%S.%fZ"
                 )
                 logger.debug(
-                    f"Last revision timestamp for file {file_name} is {revision_timestamp}"
+                    f"Last revision timestamp for file {file_name.split('/')[-1]} is {revision_timestamp}"
                 )
                 if (file_name not in objects_list) or (
                     revision_timestamp > objects_metadata.get(file_name)
@@ -162,17 +174,18 @@ def get_gdrive_files(bucket_name: str, parent_id: str) -> None:
                         bucket_name, file_download_buffer, file_name, metadata=revision
                     )
                     logger.info(
-                        f"Found file: {item['name']} ({item['id']}),"
-                        f" and (latest version) uploaded to GCS bucket: {bucket_name} and folder: {parent_id}"
+                        f"Found file: {item['name']}, and (latest version) uploaded to "
+                        f" GCS bucket: {bucket_name} and folder: {parent_id}"
                     )
                 else:
                     logger.info(
-                        f"File: {item['name']} ({item['id']} already exists in gs://{bucket_name}/{parent_id}"
+                        f"File: {item['name']} already exists in gs://{bucket_name}/{parent_id}"
                     )
-                # TODO: add deletion from GCS of non-existing files in drive
+            # Delete files from GCS that have been removed from drive
+            gcs_drive_delta = list(set(objects_list) - set(gdrive_files))
+            delete_from_gcs(bucket_name, parent_id, gcs_drive_delta)
 
             page_token = results.get("nextPageToken", None)
-
             if page_token is None:
                 break
     except HttpError as error:
