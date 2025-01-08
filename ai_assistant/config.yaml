@@ -13,3 +13,6 @@ azure:
   llm:
     model: gpt-4o-sweden
     version: 2023-03-15-preview
+  embedding:
+    model: text-embedding-3-large
+    dimensions: 1536
