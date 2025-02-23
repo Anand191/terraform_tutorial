@@ -41,10 +41,10 @@ def initialize_generator(
 ) -> dspy.Module:
     # Init LM in DSPy
     if cfg["base"]["service"] == "azure":
-        logger.info(f'Using {cfg["azure"]["llm"]["model"]}')
+        logger.info(f"Using {cfg['azure']['llm']['model']}")
         model = init_openai(temperature=temp)
     else:
-        logger.info(f'Using {cfg["gcp"]["llm"]["model"]}')
+        logger.info(f"Using {cfg['gcp']['llm']['model']}")
         model = init_gemini_pro(temperature=temp)
     # Init retriever in DsPy
     retriever = Retrieval(collection, db_location)
@@ -71,15 +71,11 @@ def chat(
     ] = "https://en.wikipedia.org/wiki/Bhagavad_Gita",
     update: Annotated[
         bool,
-        typer.Option(
-            help="Whether to update the index for this url", rich_help_panel="Options"
-        ),
+        typer.Option(help="Whether to update the index for this url", rich_help_panel="Options"),
     ] = False,
     optimize: Annotated[
         bool,
-        typer.Option(
-            help="Whether to use optimized CoT agent or not", rich_help_panel="Options"
-        ),
+        typer.Option(help="Whether to use optimized CoT agent or not", rich_help_panel="Options"),
     ] = False,
 ):
     URL_LOCAL = url.split("/")[-1]
@@ -99,9 +95,7 @@ def chat(
         store_webpage(url, CHROMA_COLLECTION_NAME, CHROMADB_DIR)
 
     # Init Generator
-    assistant = initialize_generator(
-        CHROMA_COLLECTION_NAME, CHROMADB_DIR, optimize=optimize
-    )
+    assistant = initialize_generator(CHROMA_COLLECTION_NAME, CHROMADB_DIR, optimize=optimize)
     logger.info(
         f"""
         Begin asking questions based on the wiki page about {URL_LOCAL}.

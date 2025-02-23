@@ -16,23 +16,23 @@ repos:
               __pycache__|
               logs/.*
           )$
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        name: Run black
-        entry: black
-        language: python
-        types: [python]
-        args: [--line-length=88]
-        exclude: |
-          (?x)^(
-              models/.*|
-              data/.*|
-              notebooks/.*|
-              __pycache__|
-              logs/.*
-          )$
+  # - repo: https://github.com/psf/black
+  #   rev: 24.4.2
+  #   hooks:
+  #     - id: black
+  #       name: Run black
+  #       entry: black
+  #       language: python
+  #       types: [python]
+  #       args: [--line-length=88]
+  #       exclude: |
+  #         (?x)^(
+  #             models/.*|
+  #             data/.*|
+  #             notebooks/.*|
+  #             __pycache__|
+  #             logs/.*
+  #         )$
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
     hooks:
