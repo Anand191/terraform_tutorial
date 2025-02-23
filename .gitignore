@@ -11,7 +11,6 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
 lib/
@@ -128,7 +127,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-secrets/
 
 # Mac Files
 .DS_Store
@@ -182,4 +180,6 @@ db
 #ignore certain folders
 notebooks/
 data/
+downloads/
+secrets/
 
