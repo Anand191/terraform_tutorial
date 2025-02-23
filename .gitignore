@@ -178,5 +178,7 @@ cython_debug/
 #chroma db files
 db
 
-#ignore certain notebooks
-leetcode*
+#ignore certain folders
+notebooks/
+data/
+
