@@ -174,9 +174,12 @@ cython_debug/
 .terraform
 .terraform.lock.hcl
 *.tfstate*
+*.tfplan*
 
 #chroma db files
 db
 
-#ignore certain notebooks
-leetcode*
+#ignore certain folders
+notebooks/
+data/
+
