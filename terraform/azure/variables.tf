@@ -66,19 +66,19 @@ variable "openai_deployments" {
   }))
   default = [
     {
-      name = "chatmodel-4o-mini"
+      name = "chatmodel-4o"
       model = {
-        name    = "gpt-4o-mini"
-        version = "2024-07-18"
+        name    = "gpt-4o"
+        version = "2024-11-20"
       }
       rai_policy_name = "Microsoft.DefaultV2"
       sku_name        = "GlobalStandard"
       capacity        = 30
     },
     {
-      name = "embedding-small"
+      name = "embedding-large"
       model = {
-        name    = "text-embedding-3-small"
+        name    = "text-embedding-3-large"
         version = "1"
       }
       rai_policy_name = "Microsoft.DefaultV2"

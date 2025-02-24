@@ -57,7 +57,8 @@ resource "azurerm_storage_account" "default" {
 // NETWORK RULES FOR THE STORAGE CONTAINER
 resource "azurerm_storage_account_network_rules" "storage_network_rules" {
   storage_account_id         = azurerm_storage_account.default.id
-  default_action             = "Allow"
+  default_action             = "Deny"
+  ip_rules                   = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
   virtual_network_subnet_ids = [azurerm_subnet.data_subnet.id]
   bypass                     = ["AzureServices"]
 }
@@ -79,6 +80,10 @@ resource "azurerm_search_service" "defaultsearch" {
   partition_count              = var.partition_count
   local_authentication_enabled = true
   authentication_failure_mode  = "http403"
+
+  public_network_access_enabled = true
+  allowed_ips                   = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
+  network_rule_bypass_option    = "AzureServices"
   identity {
     type = "SystemAssigned"
   }
@@ -86,12 +91,13 @@ resource "azurerm_search_service" "defaultsearch" {
 
 // AZURE OPENAI RESOURCE
 resource "azurerm_cognitive_account" "openai_resource" {
-  name                = var.openai_deployment
-  location            = "eastus2"
-  resource_group_name = azurerm_resource_group.rg.name
-  kind                = "OpenAI"
-  sku_name            = "S0"
-  tags                = var.tags
+  name                  = var.openai_deployment
+  location              = "swedencentral"
+  resource_group_name   = azurerm_resource_group.rg.name
+  kind                  = "OpenAI"
+  sku_name              = "S0"
+  tags                  = var.tags
+  custom_subdomain_name = "oai-common-rag"
 
   identity {
     type = "SystemAssigned"
@@ -103,13 +109,11 @@ resource "azurerm_cognitive_account" "openai_resource" {
     ]
   }
 
-  # network_acls {
-  #   default_action = "Deny"
-  #   bypass         = "AzureServices"
-  #   virtual_network_rules {
-  #     subnet_id = azurerm_subnet.ai_subnet.id
-  #   }
-  # }
+  network_acls {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+    ip_rules       = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
+  }
 }
 
 resource "azurerm_cognitive_deployment" "deployment" {
@@ -129,22 +133,35 @@ resource "azurerm_cognitive_deployment" "deployment" {
 }
 
 // MANAGED IDENTITY SCOPED TO BLOB CONTAINER ASSIGNED TO AI SEARCH
-resource "azurerm_role_assignment" "rbac_defaultblob" {
+resource "azurerm_role_assignment" "rbac_blob_aisearch" {
   role_definition_name = "Storage Blob Data Contributor"
   scope                = azurerm_storage_account.default.id
   principal_id         = azurerm_search_service.defaultsearch.identity[0].principal_id
 }
 
-// MANAGED IDENTITY SCOPED TO OPENAI ASSIGNED TO AI SEARCH
-resource "azurerm_role_assignment" "rbac_openai" {
-  role_definition_name = "Cognitive Services OpenAI User"
+// MANAGED IDENTITY SCOPED TO BLOB CONTAINER ASSIGNED TO OPENAI
+resource "azurerm_role_assignment" "rbac_blob_openai" {
+  role_definition_name = "Storage Blob Data Contributor"
   scope                = azurerm_storage_account.default.id
+  principal_id         = azurerm_cognitive_account.openai_resource.identity[0].principal_id
+}
+
+// MANAGED IDENTITY SCOPED TO OPENAI ASSIGNED TO AI SEARCH
+resource "azurerm_role_assignment" "rbac_openai_aisearch" {
+  role_definition_name = "Cognitive Services OpenAI Contributor"
+  scope                = azurerm_cognitive_account.openai_resource.id
   principal_id         = azurerm_search_service.defaultsearch.identity[0].principal_id
 }
 
 // MANAGED IDENTITY SCOPED TO AI SEARCH ASSIGNED TO OPENAI
-resource "azurerm_role_assignment" "rbac_aisearch" {
+resource "azurerm_role_assignment" "rbac_aisearch_openai" {
+  role_definition_name = "Search Service Contributor"
+  scope                = azurerm_search_service.defaultsearch.id
+  principal_id         = azurerm_cognitive_account.openai_resource.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "rbac_aisearch_openai_2" {
   role_definition_name = "Search Index Data Reader"
-  scope                = azurerm_storage_account.default.id
+  scope                = azurerm_search_service.defaultsearch.id
   principal_id         = azurerm_cognitive_account.openai_resource.identity[0].principal_id
 }

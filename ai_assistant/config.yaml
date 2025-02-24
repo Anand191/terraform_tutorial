@@ -11,8 +11,8 @@ gcp:
     sync_max_pages: 15
 azure:
   llm:
-    model: gpt-4o-sweden
-    version: 2023-03-15-preview
+    model: chatmodel-4o
+    version: 2024-08-01-preview
   embedding:
-    model: text-embedding-3-large
+    model: embedding-large
     dimensions: 1536
