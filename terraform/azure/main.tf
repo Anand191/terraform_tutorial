@@ -14,6 +14,10 @@ resource "azurerm_resource_group" "rg" {
   name     = random_pet.rg_name.id
 }
 
+data "azurerm_client_config" "current" {}
+
+# VNETS & SUBNETS
+# ---------------
 // Virtual Network
 resource "azurerm_virtual_network" "rg_vnet" {
   name                = "${random_pet.rg_name.id}-vnet"
@@ -22,7 +26,7 @@ resource "azurerm_virtual_network" "rg_vnet" {
   resource_group_name = azurerm_resource_group.rg.name
 }
 
-// Subnet 1
+// SUBNET 1
 resource "azurerm_subnet" "data_subnet" {
   name                 = "data"
   resource_group_name  = azurerm_resource_group.rg.name
@@ -33,7 +37,7 @@ resource "azurerm_subnet" "data_subnet" {
   private_endpoint_network_policies = "Enabled"
 }
 
-// Subnet 2
+// SUBNET 2
 resource "azurerm_subnet" "ai_subnet" {
   name                 = "ai"
   resource_group_name  = azurerm_resource_group.rg.name
@@ -44,6 +48,8 @@ resource "azurerm_subnet" "ai_subnet" {
   private_endpoint_network_policies = "Enabled"
 }
 
+# STORAGE ACCOUNT & BLOB CONTAINER
+# ---------------------------------
 // STORAGE ACCOUNT
 resource "azurerm_storage_account" "default" {
   name                            = "${var.prefix}storage${random_string.suffix.result}"
@@ -58,7 +64,7 @@ resource "azurerm_storage_account" "default" {
 resource "azurerm_storage_account_network_rules" "storage_network_rules" {
   storage_account_id         = azurerm_storage_account.default.id
   default_action             = "Deny"
-  ip_rules                   = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
+  ip_rules                   = [var.local_ip, var.static_ip, var.portal_ip]
   virtual_network_subnet_ids = [azurerm_subnet.data_subnet.id]
   bypass                     = ["AzureServices"]
 }
@@ -68,6 +74,16 @@ resource "azurerm_storage_container" "defaultblob" {
   name                  = "${var.prefix}blob${random_string.suffix.result}"
   storage_account_id    = azurerm_storage_account.default.id
   container_access_type = "private"
+}
+
+// KEY VAULT
+resource "azurerm_key_vault" "defaultkeyvault" {
+  name                     = "${var.prefix}keyvault${random_string.suffix.result}"
+  location                 = azurerm_resource_group.rg.location
+  resource_group_name      = azurerm_resource_group.rg.name
+  tenant_id                = data.azurerm_client_config.current.tenant_id
+  sku_name                 = "standard"
+  purge_protection_enabled = false
 }
 
 // AZURE AI SEARCH RESOURCE
@@ -82,17 +98,19 @@ resource "azurerm_search_service" "defaultsearch" {
   authentication_failure_mode  = "http403"
 
   public_network_access_enabled = true
-  allowed_ips                   = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
+  allowed_ips                   = [var.local_ip, var.static_ip, var.portal_ip]
   network_rule_bypass_option    = "AzureServices"
   identity {
     type = "SystemAssigned"
   }
 }
 
+# AZURE OPENAI RESOURCE & MODEL DEPLOYMENTS
+# -----------------------------------------
 // AZURE OPENAI RESOURCE
 resource "azurerm_cognitive_account" "openai_resource" {
   name                  = var.openai_deployment
-  location              = "swedencentral"
+  location              = var.cognitive_services_location
   resource_group_name   = azurerm_resource_group.rg.name
   kind                  = "OpenAI"
   sku_name              = "S0"
@@ -110,12 +128,13 @@ resource "azurerm_cognitive_account" "openai_resource" {
   }
 
   network_acls {
-    default_action = "Deny"
     bypass         = "AzureServices"
-    ip_rules       = ["79.116.174.172", "81.19.209.53", "20.50.216.43"]
+    default_action = "Deny"
+    ip_rules       = [var.local_ip, var.static_ip, var.portal_ip]
   }
 }
 
+// OPENAI MODEL DEPLOYMENTS
 resource "azurerm_cognitive_deployment" "deployment" {
   for_each             = { for deployment in var.openai_deployments : deployment.name => deployment }
   name                 = each.key
@@ -132,6 +151,55 @@ resource "azurerm_cognitive_deployment" "deployment" {
   }
 }
 
+# AI FOUNDRY RELATED
+# -----------------
+// PROVISIOn AI FOUNDRY HUB
+// Azure AI Hub
+resource "azapi_resource" "defaulthub" {
+  type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
+  name      = "${random_pet.rg_name.id}-aih"
+  location  = var.cognitive_services_location
+  parent_id = azurerm_resource_group.rg.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  body = {
+    properties = {
+      description    = "Sample Azure AI hub"
+      friendlyName   = "Sample AI Hub"
+      storageAccount = azurerm_storage_account.default.id
+      keyVault       = azurerm_key_vault.defaultkeyvault.id
+
+    }
+    kind = "hub"
+  }
+}
+
+// Azure AI Project
+resource "azapi_resource" "defaultproject" {
+  type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
+  name      = "ai-project${random_string.suffix.result}"
+  location  = var.cognitive_services_location
+  parent_id = azurerm_resource_group.rg.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  body = {
+    properties = {
+      description   = "Sample Azure AI PROJECT"
+      friendlyName  = "Sample AI project"
+      hubResourceId = azapi_resource.defaulthub.id
+    }
+    kind = "project"
+  }
+}
+
+# ALL RBACs
+# --------
 // MANAGED IDENTITY SCOPED TO BLOB CONTAINER ASSIGNED TO AI SEARCH
 resource "azurerm_role_assignment" "rbac_blob_aisearch" {
   role_definition_name = "Storage Blob Data Contributor"
@@ -164,4 +232,11 @@ resource "azurerm_role_assignment" "rbac_aisearch_openai_2" {
   role_definition_name = "Search Index Data Reader"
   scope                = azurerm_search_service.defaultsearch.id
   principal_id         = azurerm_cognitive_account.openai_resource.identity[0].principal_id
+}
+
+// MANAGED IDENTITY SCOPED TO OPENAI ASSIGNED TO AI FOUNDRY
+resource "azurerm_role_assignment" "rbac_openai_aifoundry_hub" {
+  role_definition_name = "Cognitive Services User"
+  scope                = azurerm_cognitive_account.openai_resource.id
+  principal_id         = azapi_resource.defaulthub.identity[0].principal_id
 }

@@ -4,6 +4,12 @@ variable "default_location" {
   description = "Location of the resource group."
 }
 
+variable "cognitive_services_location" {
+  type        = string
+  default     = "swedencentral"
+  description = "Location of AI Resources."
+}
+
 variable "resource_group_name_prefix" {
   type        = string
   default     = "rg"
@@ -94,3 +100,7 @@ variable "tags" {
     createdWith = "Terraform"
   }
 }
+
+variable "local_ip" { type = string }
+variable "static_ip" { type = string }
+variable "portal_ip" { type = string }
