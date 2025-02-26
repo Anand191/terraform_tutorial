@@ -153,50 +153,56 @@ resource "azurerm_cognitive_deployment" "deployment" {
 
 # AI FOUNDRY RELATED
 # -----------------
-// PROVISIOn AI FOUNDRY HUB
-// Azure AI Hub
-resource "azapi_resource" "defaulthub" {
-  type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
-  name      = "${random_pet.rg_name.id}-aih"
-  location  = var.cognitive_services_location
-  parent_id = azurerm_resource_group.rg.id
+# // Azure AI Hub
+# resource "azapi_resource" "defaulthub" {
+#   type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
+#   name      = "${random_pet.rg_name.id}-aih"
+#   location  = var.cognitive_services_location
+#   parent_id = azurerm_resource_group.rg.id
 
-  identity {
-    type = "SystemAssigned"
-  }
+#   identity {
+#     type = "SystemAssigned"
+#   }
 
-  body = {
-    properties = {
-      description    = "Sample Azure AI hub"
-      friendlyName   = "Sample AI Hub"
-      storageAccount = azurerm_storage_account.default.id
-      keyVault       = azurerm_key_vault.defaultkeyvault.id
+#   body = {
+#     properties = {
+#       description    = "Sample Azure AI hub"
+#       friendlyName   = "Sample AI Hub"
+#       storageAccount = azurerm_storage_account.default.id
+#       keyVault       = azurerm_key_vault.defaultkeyvault.id
 
-    }
-    kind = "hub"
-  }
-}
+#     }
+#     kind = "hub"
+#   }
+# }
 
-// Azure AI Project
-resource "azapi_resource" "defaultproject" {
-  type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
-  name      = "ai-project${random_string.suffix.result}"
-  location  = var.cognitive_services_location
-  parent_id = azurerm_resource_group.rg.id
+# // Azure AI Project
+# resource "azapi_resource" "defaultproject" {
+#   type      = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
+#   name      = "ai-project${random_string.suffix.result}"
+#   location  = var.cognitive_services_location
+#   parent_id = azurerm_resource_group.rg.id
 
-  identity {
-    type = "SystemAssigned"
-  }
+#   identity {
+#     type = "SystemAssigned"
+#   }
 
-  body = {
-    properties = {
-      description   = "Sample Azure AI PROJECT"
-      friendlyName  = "Sample AI project"
-      hubResourceId = azapi_resource.defaulthub.id
-    }
-    kind = "project"
-  }
-}
+#   body = {
+#     properties = {
+#       description   = "Sample Azure AI PROJECT"
+#       friendlyName  = "Sample AI project"
+#       hubResourceId = azapi_resource.defaulthub.id
+#     }
+#     kind = "project"
+#   }
+# }
+
+# // MANAGED IDENTITY SCOPED TO OPENAI ASSIGNED TO AI FOUNDRY
+# resource "azurerm_role_assignment" "rbac_openai_aifoundry_hub" {
+#   role_definition_name = "Cognitive Services User"
+#   scope                = azurerm_cognitive_account.openai_resource.id
+#   principal_id         = azapi_resource.defaulthub.identity[0].principal_id
+# }
 
 # ALL RBACs
 # --------
@@ -232,11 +238,4 @@ resource "azurerm_role_assignment" "rbac_aisearch_openai_2" {
   role_definition_name = "Search Index Data Reader"
   scope                = azurerm_search_service.defaultsearch.id
   principal_id         = azurerm_cognitive_account.openai_resource.identity[0].principal_id
-}
-
-// MANAGED IDENTITY SCOPED TO OPENAI ASSIGNED TO AI FOUNDRY
-resource "azurerm_role_assignment" "rbac_openai_aifoundry_hub" {
-  role_definition_name = "Cognitive Services User"
-  scope                = azurerm_cognitive_account.openai_resource.id
-  principal_id         = azapi_resource.defaulthub.identity[0].principal_id
 }

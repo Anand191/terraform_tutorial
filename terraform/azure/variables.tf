@@ -24,7 +24,7 @@ variable "prefix" {
 
 variable "sku" {
   description = "The pricing tier of the search service you want to create (for example, basic or standard)."
-  default     = "standard"
+  default     = "basic"
   type        = string
   validation {
     condition     = contains(["free", "basic", "standard", "standard2", "standard3", "storage_optimized_l1", "storage_optimized_l2"], var.sku)
